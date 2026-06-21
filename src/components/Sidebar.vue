@@ -2,6 +2,7 @@
 import { usePlayerStore } from "../stores/playerStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { 
+  Menu,
   Headset, 
   Star, 
   Clock, 
@@ -11,21 +12,8 @@ import {
   Setting
 } from "@element-plus/icons-vue";
 
-// Define props for current active section view
-defineProps<{
-  activeView: string;
-}>();
-
-const emit = defineEmits<{
-  (e: "change-view", view: string): void;
-}>();
-
 const playerStore = usePlayerStore();
 const settingsStore = useSettingsStore();
-
-const setView = (view: string) => {
-  emit("change-view", view);
-};
 </script>
 
 <template>
@@ -38,10 +26,10 @@ const setView = (view: string) => {
       
       <div 
         class="menu-item" 
-        :class="{ active: activeView === 'library' }" 
-        @click="setView('library')"
+        :class="{ active: playerStore.activeView === 'library' }" 
+        @click="playerStore.activeView = 'library'"
       >
-        <el-icon class="menu-icon"><Headset /></el-icon>
+        <el-icon class="menu-icon"><Menu /></el-icon>
         <span class="menu-label">{{ settingsStore.t("library") }}</span>
         <span class="badge" v-if="playerStore.queue.length > 0">
           {{ playerStore.queue.length }}
@@ -50,8 +38,20 @@ const setView = (view: string) => {
 
       <div 
         class="menu-item" 
-        :class="{ active: activeView === 'favorites' }" 
-        @click="setView('favorites')"
+        :class="{ active: playerStore.activeView === 'now-playing' }" 
+        @click="playerStore.activeView = 'now-playing'"
+      >
+        <el-icon class="menu-icon"><Headset /></el-icon>
+        <span class="menu-label">{{ settingsStore.t("nowPlaying") }}</span>
+        <span class="pulse-icon-wrapper" v-if="playerStore.isPlaying">
+          <span class="pulse-dot"></span>
+        </span>
+      </div>
+
+      <div 
+        class="menu-item" 
+        :class="{ active: playerStore.activeView === 'favorites' }" 
+        @click="playerStore.activeView = 'favorites'"
       >
         <el-icon class="menu-icon"><Star /></el-icon>
         <span class="menu-label">{{ settingsStore.t("favorites") }}</span>
@@ -62,8 +62,8 @@ const setView = (view: string) => {
 
       <div 
         class="menu-item" 
-        :class="{ active: activeView === 'history' }" 
-        @click="setView('history')"
+        :class="{ active: playerStore.activeView === 'history' }" 
+        @click="playerStore.activeView = 'history'"
       >
         <el-icon class="menu-icon"><Clock /></el-icon>
         <span class="menu-label">{{ settingsStore.t("history") }}</span>
@@ -71,8 +71,8 @@ const setView = (view: string) => {
 
       <div 
         class="menu-item" 
-        :class="{ active: activeView === 'settings' }" 
-        @click="setView('settings')"
+        :class="{ active: playerStore.activeView === 'settings' }" 
+        @click="playerStore.activeView = 'settings'"
       >
         <el-icon class="menu-icon"><Setting /></el-icon>
         <span class="menu-label">{{ settingsStore.t("settings") }}</span>
@@ -290,5 +290,32 @@ const setView = (view: string) => {
   background-color: #10b981;
   border-radius: 50%;
   box-shadow: 0 0 4px #10b981;
+}
+
+.pulse-icon-wrapper {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  padding-right: 4px;
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  background-color: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #10b981;
+  animation: pulseAnimation 1.4s infinite alternate;
+}
+
+@keyframes pulseAnimation {
+  0% {
+    transform: scale(0.8);
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
+  }
+  100% {
+    transform: scale(1.2);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+  }
 }
 </style>

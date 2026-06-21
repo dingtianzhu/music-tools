@@ -31,6 +31,9 @@ export const usePlayerStore = defineStore("player", {
     activeLyrics: [] as LyricLine[],
     currentLyricsIndex: -1,
     isInitialized: false,
+    activeView: "library", // Global routing view state
+    previousView: "library",
+    playbackMode: "mv" as "mv" | "lyrics",
   }),
 
   getters: {
@@ -45,6 +48,13 @@ export const usePlayerStore = defineStore("player", {
   actions: {
     init() {
       if (this.isInitialized) return;
+
+      // Track previous view state
+      this.$subscribe((_mutation, state) => {
+        if (state.activeView !== "now-playing") {
+          state.previousView = state.activeView;
+        }
+      });
 
       // Set initial volume
       audioService.setVolume(this.volume);
@@ -86,6 +96,7 @@ export const usePlayerStore = defineStore("player", {
         this.currentIndex = savedIndex;
         // Pre-load track without playing
         const track = this.queue[this.currentIndex];
+        this.playbackMode = this.isVideo(track.path) ? "mv" : "lyrics";
         const assetUrl = convertFileSrc(track.path);
         audioService.load(assetUrl);
         this.loadLyrics(track.path);
@@ -111,6 +122,10 @@ export const usePlayerStore = defineStore("player", {
 
       // Add to history
       this.addToHistory(track.path);
+
+      // Automatically redirect to the Now Playing page when a track starts playing
+      this.activeView = "now-playing";
+      this.playbackMode = this.isVideo(track.path) ? "mv" : "lyrics";
 
       try {
         const assetUrl = convertFileSrc(track.path);
@@ -396,5 +411,12 @@ export const usePlayerStore = defineStore("player", {
         emit("update-lyric", text);
       }
     },
+
+    // Helper to check if a track path corresponds to a video file
+    isVideo(path: string | undefined): boolean {
+      if (!path) return false;
+      const ext = path.split('.').pop()?.toLowerCase();
+      return ["mp4", "webm", "mkv", "avi"].includes(ext || "");
+    }
   },
 });

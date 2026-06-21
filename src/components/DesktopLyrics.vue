@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
-import { listen } from "@tauri-apps/api/event";
+import { listen, emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSettingsStore } from "../stores/settingsStore";
 
@@ -17,8 +17,12 @@ const startDrag = async (e: MouseEvent) => {
 };
 
 const hideWindow = async () => {
-  // Sync the switch in settings store
-  await settingsStore.setDesktopLyrics(false);
+  try {
+    await appWindow.hide();
+    await emit("desktop-lyrics-closed");
+  } catch (e) {
+    console.error("Failed to hide desktop lyrics window:", e);
+  }
 };
 
 onMounted(async () => {

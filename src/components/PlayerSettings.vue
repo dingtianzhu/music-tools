@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { useSettingsStore, Language, ThemeMode, ThemeColor } from "../stores/settingsStore";
+import { usePlayerStore } from "../stores/playerStore";
 import { Back } from "@element-plus/icons-vue";
 
-const emit = defineEmits<{
-  (e: "change-view", view: string): void;
-}>();
-
 const settingsStore = useSettingsStore();
+const playerStore = usePlayerStore();
 
 const languages = [
   { label: "中文", value: "zh" as Language },
@@ -32,7 +30,7 @@ const colorThemes = [
   <div class="settings-panel-container">
     <!-- Header -->
     <div class="settings-header">
-      <button class="icon-btn back-btn" @click="emit('change-view', 'library')">
+      <button class="icon-btn back-btn" @click="playerStore.activeView = 'library'">
         <el-icon><Back /></el-icon>
         <span>{{ settingsStore.t("back") }}</span>
       </button>

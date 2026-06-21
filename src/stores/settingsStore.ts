@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { Window } from "@tauri-apps/api/window";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 export type Language = "zh" | "en";
 export type ThemeMode = "light" | "dark";
@@ -10,6 +10,7 @@ const translations: Record<Language, Record<string, string>> = {
     library: "全部音轨",
     favorites: "我的收藏",
     history: "最近播放",
+    nowPlaying: "正在播放",
     importFiles: "导入文件",
     importFolder: "导入文件夹",
     clearLibrary: "清空曲库",
@@ -55,6 +56,7 @@ const translations: Record<Language, Record<string, string>> = {
     library: "All Tracks",
     favorites: "Favorites",
     history: "Recently Played",
+    nowPlaying: "Now Playing",
     importFiles: "Import Files",
     importFolder: "Import Folder",
     clearLibrary: "Clear Library",
@@ -129,7 +131,7 @@ export const useSettingsStore = defineStore("settings", {
       localStorage.setItem("showDesktopLyrics", show.toString());
 
       try {
-        const win = await Window.getByLabel("lyrics");
+        const win = await WebviewWindow.getByLabel("lyrics");
         if (win) {
           if (show) {
             await win.show();

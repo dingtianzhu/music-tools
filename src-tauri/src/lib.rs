@@ -5,6 +5,7 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconBuilder;
 use tauri::image::Image;
 use tauri::Manager;
+use tauri::Emitter;
 
 #[tauri::command]
 fn get_audio_metadata(path: String) -> Option<AudioMetadata> {
@@ -53,15 +54,101 @@ fn scan_dir_recursive(path: &std::path::Path, results: &mut Vec<AudioMetadata>, 
     }
 }
 
+fn read_file_to_string_lossy(path: &std::path::Path) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    
+    // First, try standard UTF-8
+    if let Ok(utf8_str) = String::from_utf8(bytes.clone()) {
+        return Some(utf8_str);
+    }
+    
+    // Fallback: try decoding as GB18030 (handles GBK / GB2312)
+    let (decoded, _, malformed) = encoding_rs::GB18030.decode(&bytes);
+    if !malformed {
+        return Some(decoded.into_owned());
+    }
+    
+    // Last resort lossy conversion
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
 #[tauri::command]
 fn read_lyrics(path: String) -> Option<String> {
     let audio_path = std::path::Path::new(&path);
-    let lrc_path = audio_path.with_extension("lrc");
-    if lrc_path.is_file() {
-        std::fs::read_to_string(lrc_path).ok()
-    } else {
-        None
+    
+    // 1. Try song.lrc
+    let lrc_path1 = audio_path.with_extension("lrc");
+    if lrc_path1.is_file() {
+        if let Some(content) = read_file_to_string_lossy(&lrc_path1) {
+            return Some(content);
+        }
     }
+
+    // 2. Try song.LRC
+    let lrc_path2 = audio_path.with_extension("LRC");
+    if lrc_path2.is_file() {
+        if let Some(content) = read_file_to_string_lossy(&lrc_path2) {
+            return Some(content);
+        }
+    }
+
+    // 3. Try song.mp3.lrc
+    let mut path_str = path.clone();
+    path_str.push_str(".lrc");
+    let lrc_path3 = std::path::Path::new(&path_str);
+    if lrc_path3.is_file() {
+        if let Some(content) = read_file_to_string_lossy(&lrc_path3) {
+            return Some(content);
+        }
+    }
+
+    // 4. Try song.mp3.LRC
+    let mut path_str_upper = path.clone();
+    path_str_upper.push_str(".LRC");
+    let lrc_path4 = std::path::Path::new(&path_str_upper);
+    if lrc_path4.is_file() {
+        if let Some(content) = read_file_to_string_lossy(&lrc_path4) {
+            return Some(content);
+        }
+    }
+
+    // 5. Try case-insensitive filename match in the parent directory
+    if let (Some(parent), Some(file_stem)) = (audio_path.parent(), audio_path.file_stem()) {
+        if let Some(stem_str) = file_stem.to_str() {
+            let stem_lower = stem_str.to_lowercase();
+            if let Ok(entries) = std::fs::read_dir(parent) {
+                for entry in entries.filter_map(Result::ok) {
+                    let entry_path = entry.path();
+                    if entry_path.is_file() {
+                        if let Some(ext) = entry_path.extension().and_then(|s| s.to_str()) {
+                            let ext_lower = ext.to_lowercase();
+                            if ext_lower == "lrc" {
+                                if let Some(name_str) = entry_path.file_stem().and_then(|s| s.to_str()) {
+                                    if name_str.to_lowercase() == stem_lower {
+                                        if let Some(content) = read_file_to_string_lossy(&entry_path) {
+                                            return Some(content);
+                                        }
+                                    }
+                                    // Handle cases like song.mp3 matching song.mp3.lrc stem
+                                    let name_lower = name_str.to_lowercase();
+                                    let audio_filename_lower = audio_path.file_name().and_then(|s| s.to_str()).map(|s| s.to_lowercase());
+                                    if let Some(audio_fn) = audio_filename_lower {
+                                        if name_lower == audio_fn {
+                                            if let Some(content) = read_file_to_string_lossy(&entry_path) {
+                                                return Some(content);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -112,10 +199,15 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // Intercept close events on main window to hide it to tray instead
+                // Intercept close events to hide windows to tray/background instead of destroying them
                 if window.label() == "main" {
                     api.prevent_close();
                     let _ = window.hide();
+                    let _ = window.emit("main-window-hidden", ());
+                } else if window.label() == "lyrics" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    let _ = window.emit("desktop-lyrics-closed", ());
                 }
             }
         })

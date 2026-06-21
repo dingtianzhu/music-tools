@@ -14,17 +14,16 @@ import {
   Memo,
   SetUp,
   RefreshRight,
-  Menu
+  Menu,
+  Monitor
 } from "@element-plus/icons-vue";
 
 defineProps<{
-  activeView: string;
   showVisualizer: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "toggle-visualizer"): void;
-  (e: "change-view", view: string): void;
 }>();
 
 const playerStore = usePlayerStore();
@@ -70,12 +69,34 @@ const loopModeTitle = computed(() => {
   if (playerStore.loopMode === "single") return settingsStore.language === 'zh' ? '单曲循环' : 'Repeat Single';
   return settingsStore.language === 'zh' ? '随机播放' : 'Shuffle Play';
 });
+
+const toggleNowPlayingView = () => {
+  if (!currentTrack.value) return;
+  if (playerStore.activeView === "now-playing") {
+    playerStore.activeView = playerStore.previousView;
+  } else {
+    playerStore.activeView = "now-playing";
+  }
+};
 </script>
 
 <template>
   <div class="player-bar">
+    <!-- Top Progress Bar (Full Width) -->
+    <div class="player-bar-progress" @mousedown.stop>
+      <el-slider 
+        v-model="playerStore.currentTime" 
+        :max="playerStore.duration || 100" 
+        :format-tooltip="formatTime"
+        @change="playerStore.seek"
+        :disabled="playerStore.queue.length === 0"
+        :show-tooltip="true"
+        class="progress-slider"
+      />
+    </div>
+
     <!-- Left: Song Info -->
-    <div class="song-info">
+    <div class="song-info" :class="{ 'clickable': currentTrack }" @click="toggleNowPlayingView">
       <div class="cover-wrapper" :class="{ playing: playerStore.isPlaying && currentTrack }">
         <img 
           v-if="currentTrack?.cover" 
@@ -164,30 +185,31 @@ const loopModeTitle = computed(() => {
         </button>
       </div>
 
-      <!-- Timeline Progress Bar -->
-      <div class="timeline">
-        <span class="time-label">{{ formatTime(playerStore.currentTime) }}</span>
-        
-        <el-slider 
-          v-model="playerStore.currentTime" 
-          :max="playerStore.duration || 100" 
-          :format-tooltip="formatTime"
-          @change="playerStore.seek"
-          :disabled="playerStore.queue.length === 0"
-          class="slider"
-        />
-        
-        <span class="time-label">{{ formatTime(playerStore.duration) }}</span>
+      <!-- Centered Time Display -->
+      <div class="time-display">
+        <span>{{ formatTime(playerStore.currentTime) }}</span>
+        <span class="divider">/</span>
+        <span>{{ formatTime(playerStore.duration) }}</span>
       </div>
     </div>
 
     <!-- Right: Volume & Extra Actions -->
     <div class="volume-section">
+      <!-- Desktop Lyrics Toggle -->
+      <button 
+        class="icon-btn" 
+        :class="{ active: settingsStore.showDesktopLyrics }"
+        @click="settingsStore.setDesktopLyrics(!settingsStore.showDesktopLyrics)"
+        :title="settingsStore.t('desktopLyrics')"
+      >
+        <el-icon><Monitor /></el-icon>
+      </button>
+
       <!-- Lyrics View Toggle -->
       <button 
         class="icon-btn" 
-        :class="{ active: activeView === 'lyrics' }"
-        @click="emit('change-view', activeView === 'lyrics' ? 'library' : 'lyrics')"
+        :class="{ active: playerStore.activeView === 'now-playing' }"
+        @click="playerStore.activeView = playerStore.activeView === 'now-playing' ? 'library' : 'now-playing'"
         :title="settingsStore.language === 'zh' ? '显示歌词面板' : 'View Fullscreen Lyrics'"
       >
         <el-icon><Memo /></el-icon>
@@ -221,6 +243,7 @@ const loopModeTitle = computed(() => {
   padding: 0 24px;
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
   transition: background-color 0.2s, border-color 0.2s;
+  position: relative;
 }
 
 /* Left: Song Info */
@@ -311,7 +334,7 @@ const loopModeTitle = computed(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-grow: 1;
   max-width: 480px;
   padding: 0 12px;
@@ -429,5 +452,103 @@ const loopModeTitle = computed(() => {
 button.icon-btn.active {
   color: var(--primary-color);
   filter: drop-shadow(0 0 4px var(--primary-color));
+}
+
+.song-info.clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px;
+  margin: -4px;
+  transition: background-color 0.2s;
+}
+
+.song-info.clickable:hover {
+  background-color: var(--panel-bg-hover);
+}
+
+.song-info.clickable:hover .cover-wrapper {
+  transform: scale(1.04);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 10px var(--active-glow);
+}
+
+.song-info.clickable:hover .title {
+  color: var(--primary-color);
+}
+
+/* Full-width top progress bar */
+.player-bar-progress {
+  position: absolute;
+  top: -8px; /* Center perfectly on the top border of the player bar */
+  left: 0;
+  right: 0;
+  height: 16px;
+  z-index: 100;
+  cursor: pointer;
+}
+
+.player-bar-progress :deep(.el-slider) {
+  height: 16px;
+  margin: 0;
+  padding: 0;
+}
+
+.player-bar-progress :deep(.el-slider__runway) {
+  height: 2px !important;
+  margin: 7px 0 !important;
+  border-radius: 0;
+  background-color: var(--border-color) !important;
+  transition: height 0.2s, background-color 0.2s;
+}
+
+.player-bar-progress :deep(.el-slider__bar) {
+  height: 2px !important;
+  border-radius: 0;
+  transition: height 0.2s;
+}
+
+.player-bar-progress :deep(.el-slider__button-wrapper) {
+  top: -9px !important;
+  width: 20px;
+  height: 20px;
+}
+
+.player-bar-progress :deep(.el-slider__button) {
+  border: 2px solid var(--primary-color) !important;
+  background-color: #ffffff !important;
+  width: 10px !important;
+  height: 10px !important;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+/* Expand track and reveal handle on hover */
+.player-bar-progress:hover :deep(.el-slider__runway),
+.player-bar-progress:hover :deep(.el-slider__bar) {
+  height: 4px !important;
+}
+
+.player-bar-progress:hover :deep(.el-slider__button) {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Centered time display */
+.time-display {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: monospace;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+  font-weight: 500;
+  height: 16px;
+}
+
+.time-display .divider {
+  color: var(--text-muted);
+  margin: 0 2px;
 }
 </style>
